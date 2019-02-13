@@ -29,6 +29,7 @@ TODO: Add long description of the pod here.
   # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
   s.ios.deployment_target = '8.0'
+  s.swift_version = '4.2'
 
   s.source_files = 'RxReduxift/Classes/**/*'
   
@@ -39,4 +40,6 @@ TODO: Add long description of the pod here.
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
   # s.dependency 'AFNetworking', '~> 2.3'
+  s.dependency 'Reduxift', '~> 0.1'
+  s.dependency 'RxSwift', '~> 4.0'
 end
