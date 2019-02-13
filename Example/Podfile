@@ -1,0 +1,11 @@
+use_frameworks!
+
+target 'RxReduxift_Example' do
+  pod 'RxReduxift', :path => '../'
+
+  target 'RxReduxift_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end
