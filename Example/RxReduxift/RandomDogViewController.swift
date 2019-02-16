@@ -20,7 +20,6 @@ enum RandomDogAction: Action {
     case fetch(breed: String?)
     case reload(url: String)
     case alert(String)
-    case clearAlert
 }
 
 extension RandomDogAction {
@@ -74,8 +73,6 @@ extension RandomDogAction {
             
         case let .alert(msg):
             return msg
-        case .clearAlert:
-            return ""
         }
     }
 }
@@ -167,7 +164,7 @@ extension RandomDogViewController {
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned self] (actin) in
-            _ = self.store.dispatch(RandomDogAction.clearAlert)
+            _ = self.store.dispatch(RandomDogAction.alert(""))
         })
         
         self.present(alert, animated: true, completion: nil)

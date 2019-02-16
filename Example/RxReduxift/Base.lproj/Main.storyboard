@@ -12,7 +12,7 @@
         <!--Random Dog View Controller-->
         <scene sceneID="wzT-qK-HcE">
             <objects>
-                <viewController id="W6M-l9-vIl" customClass="RandomDogViewController" customModule="Reduxift_Example" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="randomdog" id="W6M-l9-vIl" customClass="RandomDogViewController" customModule="RxReduxift_Example" customModuleProvider="target" sceneMemberID="viewController">
                     <layoutGuides>
                         <viewControllerLayoutGuide type="top" id="NNd-fX-Q8i"/>
                         <viewControllerLayoutGuide type="bottom" id="Ovy-ca-ipQ"/>
@@ -22,7 +22,7 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="abW-Hy-Fh8">
-                                <rect key="frame" x="0.0" y="64" width="375" height="603"/>
+                                <rect key="frame" x="0.0" y="20" width="375" height="647"/>
                             </imageView>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
@@ -60,7 +60,7 @@
         <!--Breed List View Controller-->
         <scene sceneID="g1T-lY-rxa">
             <objects>
-                <viewController id="lcc-J8-JrB" customClass="BreedListViewController" customModule="Reduxift_Example" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="breedlist" id="lcc-J8-JrB" customClass="BreedListViewController" customModule="RxReduxift_Example" customModuleProvider="target" sceneMemberID="viewController">
                     <layoutGuides>
                         <viewControllerLayoutGuide type="top" id="M5p-bO-DqW"/>
                         <viewControllerLayoutGuide type="bottom" id="4QR-ay-XKx"/>
@@ -89,15 +89,8 @@
                                                 </label>
                                             </subviews>
                                         </tableViewCellContentView>
-                                        <connections>
-                                            <segue destination="W6M-l9-vIl" kind="show" id="Qmv-Ua-R7O"/>
-                                        </connections>
                                     </tableViewCell>
                                 </prototypes>
-                                <connections>
-                                    <outlet property="dataSource" destination="lcc-J8-JrB" id="opk-Qx-fpK"/>
-                                    <outlet property="delegate" destination="lcc-J8-JrB" id="vJz-zp-5V0"/>
-                                </connections>
                             </tableView>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>

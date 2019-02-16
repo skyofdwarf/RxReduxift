@@ -3,6 +3,8 @@ use_frameworks!
 target 'RxReduxift_Example' do
   pod 'RxReduxift', :path => '../'
 
+  pod 'RxCocoa', '~> 4.0'
+
   target 'RxReduxift_Tests' do
     inherit! :search_paths
 

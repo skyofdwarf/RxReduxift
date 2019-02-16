@@ -10,12 +10,13 @@ import UIKit
 import Reduxift
 import RxReduxift
 import RxSwift
+import RxCocoa
+
 
 enum BreedListAction: Action {
     case fetch(breed: String?)
     case reload([String])
     case alert(String)
-    case clearAlert
 }
 
 extension BreedListAction {
@@ -29,19 +30,21 @@ extension BreedListAction {
                     _ = dispatch(.alert("failed to create a url for breed: \(breed ?? "no brred")"))
                     return nil
                 }
+                
+
                 let task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                     guard error == nil else {
                         _ = dispatch(.alert("failed to load breeds: \(error!)"))
                         return
                     }
-                    
+
                     guard
                         let data = data,
                         let json = try? JSONSerialization.jsonObject(with: data, options: []) as! [String: Any] else {
                             _ = dispatch(.alert("failed to parse json from response"))
                             return
                     }
-                    
+
                     if let breeds = json.message as Any? as? [String: Any] {
                         print("breeds: \(breeds)")
                         _ = dispatch(.reload(Array(breeds.keys)))
@@ -51,12 +54,12 @@ extension BreedListAction {
                         _ = dispatch(.reload([]))
                     }
                 })
-                
+
                 task.resume()
-                
+
                 return {
                     task.cancel()
-                    
+
                     print("fetching cancelled")
                 }
             }
@@ -65,8 +68,6 @@ extension BreedListAction {
             return breeds
         case let .alert(msg):
             return msg;
-        case .clearAlert:
-            return "";
         }
         
     }
@@ -163,21 +164,33 @@ extension BreedListViewController {
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned self] (actin) in
-            _ = self.store.dispatch(BreedListAction.clearAlert)
+            _ = self.store.dispatch(BreedListAction.alert(""))
         })
         
         self.present(alert, animated: true, completion: nil)
     }
     
     func observeBreeds(from state: Observable<DictionaryState>) {
-        state.map { (state) in
+        
+        let breeds = state.map { (state) in
             return state.data?.dogs?.breeds as Any? as! [String]
             }
-            .do(onNext: { _ in print("breeds do next") })
             .distinctUntilChanged()
-            .subscribe(onNext: { [weak self] breeds in
-                print("next breeds: \(breeds)")
-                self?.tableView.reloadData()
+            .share()
+        
+        breeds.bind(to: self.tableView.rx.items(cellIdentifier: "BreedCell")) { (row, breed, cell) in
+                cell.textLabel?.text = breed
+            }.disposed(by: self.store.db)
+        
+        self.tableView.rx.itemSelected.withLatestFrom(breeds) { (ip, breeds) in
+            return breeds[ip.row]
+            }
+            .subscribe(onNext: { [weak self] breed in
+                if let vc = self?.storyboard?.instantiateViewController(withIdentifier: "randomdog") as? RandomDogViewController {
+                    vc.breed = breed
+                    
+                    self?.show(vc, sender: nil)
+                }
             }).disposed(by: self.store.db)
     }
     
@@ -185,35 +198,10 @@ extension BreedListViewController {
         state.map { state in
             return state.alert as Any? as! String
             }
-            .do(onNext: { _ in print("alert do next") })
             .filter({ !$0.isEmpty })
             .subscribe(onNext: { [weak self] msg in
                 print("next alert: \(msg)")
                 self?.alert(msg)
             }).disposed(by: self.store.db)
-    }
-}
-
-
-extension BreedListViewController: UITableViewDataSource  {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if let breeds = self.store.currentState.data?.dogs?.breeds as Any? as? [String] {
-            return breeds.count
-        }
-        else  {
-            return 0
-        }
-    }
-}
-
-extension BreedListViewController: UITableViewDelegate {
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "BreedCell", for: indexPath)
-        
-        if let breeds = self.store.currentState.data?.dogs?.breeds as Any? as? [String] {
-            let breed = breeds[indexPath.row]
-            cell.textLabel?.text = breed
-        }
-        return cell
     }
 }
