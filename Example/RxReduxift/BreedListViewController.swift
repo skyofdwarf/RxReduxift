@@ -78,6 +78,8 @@ extension BreedListAction {
 class BreedListViewController: UIViewController {
     @IBOutlet weak var tableView: UITableView!
     
+    let db = DisposeBag()
+    
     lazy var store: RxDictionaryStore = createStore()
     
     override func viewDidLoad() {
@@ -85,16 +87,9 @@ class BreedListViewController: UIViewController {
 
         // Do any additional setup after loading the view.
         
-        let fetchButton = UIBarButtonItem(title: "Fetch",
-                                          style: .plain,
-                                          target: self,
-                                          action: #selector(BreedListViewController.fetchButtonDidClick))
-        let toastButton = UIBarButtonItem(title: "Toast",
-                                          style: .plain,
-                                          target: self,
-                                          action: #selector(BreedListViewController.toastButtonDidClick))
-        self.navigationItem.leftBarButtonItem = toastButton
-        self.navigationItem.rightBarButtonItem = fetchButton
+        self.title = "RxReduxift"
+
+        buildBarButtons()
         
         observeBreeds(from: self.store.state)
         observeAlertMessage(from: self.store.state)
@@ -115,14 +110,6 @@ class BreedListViewController: UIViewController {
         // Pass the selected object to the new view controller.
     }
     */
-    
-    @objc func fetchButtonDidClick(_ sender: Any) {
-        _ = self.store.dispatch(BreedListAction.fetch(breed: nil))
-    }
-    
-    @objc func toastButtonDidClick(_ sender: Any) {
-        _ = self.store.dispatch(BreedListAction.alert("welcome!"))
-    }
 }
 
 extension BreedListViewController {
@@ -146,7 +133,7 @@ extension BreedListViewController {
         }
         
         let reducer = DictionaryStore.reduce { (state, action) in
-            return [ "description": "Reduxift Example App",
+            return [ "description": "RxReduxift Example App",
                      "data": [ "dogs": [ "breeds": breedsReducer(state.data?.dogs?.breeds, action),
                                          "shout": "bow" ],
                                "cats": "NA" ],
@@ -159,6 +146,21 @@ extension BreedListViewController {
                                  middlewares:[ MainQueueMiddleware(),
                                                FunctionMiddleware({ print("log: \($1)") }),
                                                AsyncActionMiddleware() ])
+    }
+}
+
+extension BreedListViewController {
+    func buildBarButtons() {
+        let fetchButton = UIBarButtonItem(title: "Fetch",
+                                          style: .plain,
+                                          target: nil,
+                                          action: nil)
+
+        self.navigationItem.rightBarButtonItem = fetchButton
+        
+        fetchButton.rx.tap.bind { [weak self] in
+            _ = self?.store.dispatch(BreedListAction.fetch(breed: nil))
+            }.disposed(by: self.db)
     }
     
     func alert(_ msg: String) {

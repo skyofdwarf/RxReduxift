@@ -11,15 +11,20 @@ import Reduxift
 import RxReduxift
 import RxSwift
 
+extension String: Error {}
+
 struct RandomDogState: State {
     var imageUrl: String = ""
     var alert: String = ""
+    var fetching: Bool = false
 }
 
 enum RandomDogAction: Action {
     case fetch(breed: String?)
-    case reload(url: String)
     case alert(String)
+    
+    case requestImageUrlFor(_ breed: String?)
+    case receiveImageUrl(_ url: String)
 }
 
 extension RandomDogAction {
@@ -36,9 +41,13 @@ extension RandomDogAction {
                     _ = dispatch(.alert("failed to create a url of random dog for breed: \(breed ?? "no brred")"))
                     return nil
                 }
+                
+                _ = dispatch(.requestImageUrlFor(breed))
+                
                 let task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                     guard error == nil else {
-                        _ = dispatch(.alert("failed to load breeds: \(error!)"))
+                        print("error: \(error!)")
+                        _ = dispatch(.alert(error!.localizedDescription))
                         return
                     }
                     
@@ -51,7 +60,7 @@ extension RandomDogAction {
                     
                     if let imageUrl = json.message as Any? as? String {
                         print("image url: \(imageUrl)")
-                        _ = dispatch(.reload(url: imageUrl))
+                        _ = dispatch(.receiveImageUrl(imageUrl))
                     }
                     else {
                         print("no image url")
@@ -63,17 +72,76 @@ extension RandomDogAction {
                 
                 return {
                     task.cancel()
-                    
-                    _ = dispatch(.alert("fetching cancelled"))
                 }
             }
             
-        case let .reload(url):
+        case let .requestImageUrlFor(breed):
+            return breed
+            
+        case let .receiveImageUrl(url):
             return url
             
         case let .alert(msg):
             return msg
         }
+    }
+    
+    static func fetchImageUrlFor(breed: String?) -> Observable<String> {
+        return Observable<String>.create { (observer) -> Disposable in
+            let urlString = ((breed == nil) ?
+                "https://dog.ceo/api/breeds/image/random":
+                "https://dog.ceo/api/breed/\(breed!)/images/random")
+            
+            guard let url = URL(string: urlString) else {
+                observer.onError("failed to create a url of random dog for breed: \(breed ?? "no brred")")
+                return Disposables.create()
+            }
+            
+            let task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
+                guard error == nil else {
+                    print("error: \(error!)")
+                    observer.onError(error!.localizedDescription)
+                    return
+                }
+                
+                guard
+                    let data = data,
+                    let json = try? JSONSerialization.jsonObject(with: data, options: []) as! [String: Any] else {
+                        observer.onError("failed to parse json from response")
+                        return
+                }
+                
+                if let imageUrl = json.message as Any? as? String {
+                    print("image url: \(imageUrl)")
+                    observer.onNext(imageUrl)
+                    observer.onCompleted()
+                }
+                else {
+                    print("no image url")
+                    observer.onError("no image url")
+                }
+            })
+            task.resume()
+            
+            return Disposables.create {
+                task.cancel()
+            }
+        }
+    }
+    
+    static func fetchImage(url: String) -> Observable<UIImage> {
+        return Observable<UIImage>.create { (observer) -> Disposable in
+            if let url = URL(string: url), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                observer.onNext(image)
+                observer.onCompleted()
+            }
+            else {
+                observer.onError("failed to download image data from: \(url)")
+            }
+            
+            return Disposables.create()
+        }
+        .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background)).share()
     }
 }
 
@@ -81,6 +149,15 @@ extension RandomDogAction {
 
 class RandomDogViewController: UIViewController {
     @IBOutlet weak var dogImageView: UIImageView!
+    
+    var indicator: UIActivityIndicatorView!
+    
+    var fetchButton: UIBarButtonItem!
+    var cancelButton: UIBarButtonItem!
+    
+    let db = DisposeBag()
+    
+    
     lazy var store: RxStore<RandomDogState> = createStore()
     var canceller: Action.AsyncCanceller?
     
@@ -91,44 +168,19 @@ class RandomDogViewController: UIViewController {
 
         // Do any additional setup after loading the view.
         
-        let cancelButton = UIBarButtonItem(title: "Cancel",
-                                           style: .plain,
-                                           target: self,
-                                           action: #selector(RandomDogViewController.cancelButtonDidClick))
-        let fetchButton = UIBarButtonItem(title: "Fetch",
-                                          style: .plain,
-                                          target: self,
-                                          action: #selector(RandomDogViewController.fetchButtonDidClick))
+        self.title = self.breed ?? "Random Dog"
         
-        self.navigationItem.rightBarButtonItems = [ fetchButton, cancelButton ]
+        buildIndicator()
+        buildBarButtons()
         
         observeDogImage(from: self.store.state)
         observeAlertMessage(from: self.store.state)
+        observeFetchingStatus(from: self.store.state)
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        self.reload()
-    }
-    
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
-        // Get the new view controller using segue.destination.
-        // Pass the selected object to the new view controller.
-    }
-    */
-    
-    @objc func cancelButtonDidClick(_ sender: Any?) {
-        self.canceller?()
-        self.canceller = nil
-    }
-    
-    @objc func fetchButtonDidClick(_ sender: Any?) {
         self.reload()
     }
 }
@@ -143,10 +195,14 @@ extension RandomDogViewController {
             var state = state
             
             switch action {
-            case let .reload(url):
+            case .requestImageUrlFor:
+                state.fetching = true
+            case let .receiveImageUrl(url):
                 state.imageUrl = url
+                state.fetching = false
             case let .alert(msg):
                 state.alert = msg
+                state.fetching = false
             default:
                 return state
             }
@@ -160,6 +216,41 @@ extension RandomDogViewController {
                                                      FunctionMiddleware({ print("log: \($1)") }),
                                                      AsyncActionMiddleware() ])
     }
+}
+
+extension RandomDogViewController {
+    func buildIndicator() {
+        self.indicator = UIActivityIndicatorView(style: .gray)
+        self.indicator.hidesWhenStopped = true
+        
+        self.view.addSubview(self.indicator)
+        self.view.bringSubviewToFront(self.indicator)
+        
+        self.indicator.center = self.view.center
+    }
+    
+    func buildBarButtons() {
+        self.fetchButton = UIBarButtonItem(title: "Fetch",
+                                           style: .plain,
+                                           target: nil,
+                                           action: nil)
+        
+        self.cancelButton = UIBarButtonItem(title: "Cancel",
+                                            style: .plain,
+                                            target: nil,
+                                            action: nil)
+        
+        self.navigationItem.rightBarButtonItems = [ self.cancelButton, self.fetchButton ]
+        
+        self.fetchButton.rx.tap.bind { [weak self] in
+            self?.reload()
+            }.disposed(by: self.db)
+        
+        self.cancelButton.rx.tap.bind { [weak self] in
+            self?.cancel()
+            }.disposed(by: self.db)
+    }
+
     
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
@@ -172,6 +263,15 @@ extension RandomDogViewController {
     
     func reload() {
         self.canceller = self.store.dispatch(RandomDogAction.fetch(breed: self.breed)) as? Action.AsyncCanceller
+    }
+    
+    func cancel() {
+        self.canceller?()
+        clearCanceller()
+    }
+    
+    func clearCanceller() {
+        self.canceller = nil
     }
     
     func observeDogImage(from state: Observable<RandomDogState>) {
@@ -189,10 +289,31 @@ extension RandomDogViewController {
     func observeAlertMessage(from state: Observable<RandomDogState>) {
         state
             .map { return $0.alert as Any? as! String }
+            .distinctUntilChanged()
             .filter { !$0.isEmpty }
             .subscribe(onNext: { [weak self] msg in
                 self?.alert(msg)
             }).disposed(by: self.store.db)
+    }
+    
+    func observeFetchingStatus(from state: Observable<RandomDogState>) {
+        let fetching = state
+            .map { return $0.fetching as Any? as! Bool }
+            .distinctUntilChanged()
+            .share()
+        
+        fetching
+            .bind(to: self.cancelButton.rx.isEnabled)
+            .disposed(by: self.db)
+        
+        fetching
+            .map { return !$0 }
+            .bind(to: self.fetchButton.rx.isEnabled)
+            .disposed(by: self.db)
+        
+        fetching
+            .bind(to: self.indicator.rx.isAnimating)
+            .disposed(by: self.db)
     }
 }
 
