@@ -31,49 +31,18 @@ extension RandomDogAction {
     var payload: Any? {
         switch self {
         case let .fetch(breed):
-            return async { (dispatch) in
-                let urlString = ((breed == nil) ?
-                    "https://dog.ceo/api/breeds/image/random":
-                    "https://dog.ceo/api/breed/\(breed!)/images/random")
-                
-                
-                guard let url = URL(string: urlString) else {
-                    _ = dispatch(.alert("failed to create a url of random dog for breed: \(breed ?? "no brred")"))
-                    return nil
-                }
-                
+            return observable { (dispatch) -> Observable<String> in
                 _ = dispatch(.requestImageUrlFor(breed))
                 
-                let task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
-                    guard error == nil else {
-                        print("error: \(error!)")
-                        _ = dispatch(.alert(error!.localizedDescription))
-                        return
-                    }
-                    
-                    guard
-                        let data = data,
-                        let json = try? JSONSerialization.jsonObject(with: data, options: []) as! [String: Any] else {
-                            _ = dispatch(.alert("failed to parse json from response"))
-                            return
-                    }
-                    
-                    if let imageUrl = json.message as Any? as? String {
-                        print("image url: \(imageUrl)")
-                        _ = dispatch(.receiveImageUrl(imageUrl))
-                    }
-                    else {
-                        print("no image url")
-                        _ = dispatch(.alert("no image url"))
-                    }
-                })
-                
-                task.resume()
-                
-                return {
-                    task.cancel()
-                }
+                return RandomDogAction.fetchImageUrl(for: breed)
+                    .debug()
+                    .do(onNext: { (url) in
+                        _ = dispatch(.receiveImageUrl(url))
+                    }, onError: { (error) in
+                        _ = dispatch(.alert("failed to parse json from response"))
+                    })
             }
+
             
         case let .requestImageUrlFor(breed):
             return breed
@@ -86,8 +55,8 @@ extension RandomDogAction {
         }
     }
     
-    static func fetchImageUrlFor(breed: String?) -> Observable<String> {
-        return Observable<String>.create { (observer) -> Disposable in
+    static func fetchImageUrl(for breed: String?) -> Observable<String> {
+        return Observable.create { (observer) -> Disposable in
             let urlString = ((breed == nil) ?
                 "https://dog.ceo/api/breeds/image/random":
                 "https://dog.ceo/api/breed/\(breed!)/images/random")
@@ -128,25 +97,11 @@ extension RandomDogAction {
             }
         }
     }
-    
-    static func fetchImage(url: String) -> Observable<UIImage> {
-        return Observable<UIImage>.create { (observer) -> Disposable in
-            if let url = URL(string: url), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-                observer.onNext(image)
-                observer.onCompleted()
-            }
-            else {
-                observer.onError("failed to download image data from: \(url)")
-            }
-            
-            return Disposables.create()
-        }
-        .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background)).share()
-    }
 }
 
 
 
+/// Example to use user defined state
 class RandomDogViewController: UIViewController {
     @IBOutlet weak var dogImageView: UIImageView!
     
@@ -155,13 +110,17 @@ class RandomDogViewController: UIViewController {
     var fetchButton: UIBarButtonItem!
     var cancelButton: UIBarButtonItem!
     
-    let db = DisposeBag()
-    
+    let db = DisposeBag()    
+    var compositeDisposable: CompositeDisposable?
     
     lazy var store: RxStore<RandomDogState> = createStore()
-    var canceller: Action.AsyncCanceller?
+    
     
     var breed: String?
+    
+    deinit {
+        print("deinit")
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -214,11 +173,10 @@ extension RandomDogViewController {
                                        reducer: reducer,
                                        middlewares:[ MainQueueMiddleware(),
                                                      FunctionMiddleware({ print("log: \($1)") }),
-                                                     AsyncActionMiddleware() ])
+                                                     AsyncActionMiddleware(),
+                                                     ObservablePayloadMiddleware() ])
     }
-}
 
-extension RandomDogViewController {
     func buildIndicator() {
         self.indicator = UIActivityIndicatorView(style: .gray)
         self.indicator.hidesWhenStopped = true
@@ -250,8 +208,9 @@ extension RandomDogViewController {
             self?.cancel()
             }.disposed(by: self.db)
     }
+}
 
-    
+extension RandomDogViewController {
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned self] (actin) in
@@ -262,28 +221,40 @@ extension RandomDogViewController {
     }
     
     func reload() {
-        self.canceller = self.store.dispatch(RandomDogAction.fetch(breed: self.breed)) as? Action.AsyncCanceller
+        if let disposable = self.store.dispatch(RandomDogAction.fetch(breed: self.breed)) as? Disposable {
+            
+            disposable.disposed(by: self.db)
+            
+            self.compositeDisposable = CompositeDisposable(disposables: [ disposable ])
+        }
     }
     
     func cancel() {
-        self.canceller?()
-        clearCanceller()
+        if let isDisposed = self.compositeDisposable?.isDisposed, !isDisposed {
+            self.compositeDisposable?.dispose()
+            self.compositeDisposable = nil
+            
+            _ = self.store.dispatch(RandomDogAction.alert("user cancelled"))
+        }
     }
     
-    func clearCanceller() {
-        self.canceller = nil
-    }
-    
+    /// - Note: don't care data downloading of image in here. in practice download and display of image are covered other frameworks cares about based on url of image.
     func observeDogImage(from state: Observable<RandomDogState>) {
+        
         state
             .map{ return $0.imageUrl }
             .distinctUntilChanged()
             .filter { !$0.isEmpty }
-            .flatMapLatest({ RandomDogViewController.fetchImage(url: $0) })
+            .flatMap({ fetchImage(url: $0) })
             .observeOn(MainScheduler.instance)
-            .subscribe(onNext: { [weak self] image in
+            .do(onError: { [weak self] (error) in
+                _ = self?.store.dispatch(RandomDogAction.alert(error.localizedDescription))
+            })
+            .catchErrorJustReturn(nil)
+            .subscribe(onNext: { [weak self] (image) in
                 self?.dogImageView.image = image
-            }).disposed(by: self.store.db)
+            })
+            .disposed(by: self.store.db)
     }
     
     func observeAlertMessage(from state: Observable<RandomDogState>) {
@@ -317,18 +288,18 @@ extension RandomDogViewController {
     }
 }
 
-extension RandomDogViewController {
-    static func fetchImage(url: String) -> Observable<UIImage?> {
-        return Observable<UIImage?>.create { (observer) -> Disposable in
-            if let url = URL(string: url), let data = try? Data(contentsOf: url) {
-                observer.onNext(UIImage(data: data))
-            }
-            else {
-                observer.onNext(nil)
-            }
-            
-            return Disposables.create()
-            }.subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background)).share()
-    }
-    
+
+fileprivate func fetchImage(url: String) -> Observable<UIImage?> {
+    return Observable.create { (observer) -> Disposable in
+        if let url = URL(string: url), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+            observer.onNext(image)
+            observer.onCompleted()
+        }
+        else {
+            observer.onError("failed to download image data from: \(url)")
+        }
+        
+        return Disposables.create()
+        }
+        .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background)).share()
 }
