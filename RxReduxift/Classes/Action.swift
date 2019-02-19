@@ -27,21 +27,10 @@ extension Reduxift.Action {
     ///
     /// - Parameter action: closure to create an observable
     /// - Returns: ObservableAction
-    public static func observable<O>(_ action: @escaping GenericObservable<Self, O>) -> ObservableAction {
-        return ObservableAction(action)
-    }
-}
-
-
-/// ObservableAction embeds Observable and designed to be dispatched
-public struct ObservableAction: Action {
-    public let payload: Any?
-    
-    init<A: Action, O>(_ action: @escaping GenericObservable<A, O>) {
-        self.payload = { dispatch -> Disposable in
+    public static func observable<O>(_ action: @escaping GenericObservable<Self, O>) -> Action.ObservablePayload {
+        return { dispatch -> Disposable in
             return action(dispatch).subscribe()
-        } as Action.ObservablePayload
+        }
     }
 }
-
 

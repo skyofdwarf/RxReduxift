@@ -31,7 +31,7 @@ extension RandomDogAction {
     var payload: Any? {
         switch self {
         case let .fetch(breed):
-            return observable { (dispatch) -> Observable<String> in
+            return RandomDogAction.observable { (dispatch) -> Observable<String> in
                 _ = dispatch(.requestImageUrlFor(breed))
                 
                 return RandomDogAction.fetchImageUrl(for: breed)
