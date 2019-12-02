@@ -1,23 +1,16 @@
 PODS:
-  - Reduxift (0.1.0)
-  - RxAtomic (4.4.1)
-  - RxCocoa (4.4.1):
-    - RxSwift (~> 4.0)
-  - RxReduxift (0.1.0):
-    - Reduxift (~> 0.1)
-    - RxSwift (~> 4.0)
-  - RxSwift (4.4.1):
-    - RxAtomic (~> 4.4)
+  - Reduxift (0.3.0)
+  - RxReduxift (0.2.0):
+    - Reduxift (~> 0.3.0)
+    - RxSwift (~> 5.0)
+  - RxSwift (5.0.1)
 
 DEPENDENCIES:
-  - RxCocoa (~> 4.0)
   - RxReduxift (from `../`)
 
 SPEC REPOS:
-  https://github.com/cocoapods/specs.git:
+  trunk:
     - Reduxift
-    - RxAtomic
-    - RxCocoa
     - RxSwift
 
 EXTERNAL SOURCES:
@@ -25,12 +18,10 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  Reduxift: 6b4854dd7fbc0e41b28a470754b6c250b357b94a
-  RxAtomic: f8d6adc1ccb87a767811269e4875887bc74dbf19
-  RxCocoa: 2f35a76bf8887872e28a1914112395b11b8e0e64
-  RxReduxift: 2b8eace94dfa8858ea210a0be91da0ca3d857b5a
-  RxSwift: 92fcf68dfef21f3e2ab1965363d9e7b3d787597e
+  Reduxift: f7250b4e8ecedaf65e0c7825f3164418a090d17c
+  RxReduxift: fcb845c9c64ea3007c1ebef30f383f4aee4d5484
+  RxSwift: e2dc62b366a3adf6a0be44ba9f405efd4c94e0c4
 
-PODFILE CHECKSUM: 3ecf5cabb6b709a6029038c34a1721b740b17ccd
+PODFILE CHECKSUM: 9efad13a98fde5cd999d3e67df80cd9b036f038a
 
-COCOAPODS: 1.6.0
+COCOAPODS: 1.8.4

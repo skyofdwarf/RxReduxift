@@ -10,7 +10,7 @@ import UIKit
 import Reduxift
 import RxReduxift
 import RxSwift
-import RxCocoa
+//import RxCocoa
 
 
 enum BreedListAction: Action {

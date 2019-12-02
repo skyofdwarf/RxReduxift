@@ -9,33 +9,36 @@ import Foundation
 import Reduxift
 import RxSwift
 
-public typealias RxDictionaryStore = RxStore<DictionaryState>
+public class RxStore<StateType: State> {
+    private let store: Store<StateType>
+    private let subscription: BehaviorSubject<(StateType, Action)>
+    private let db = DisposeBag()
 
+    public var state: Observable<StateType> { subscription.asObservable().map { $0.0 } }
+    public var action: Observable<Action> { subscription.asObservable().map { $0.1 } }
 
-public class RxStore<S: State> {
-    private let store: Store<S>
-    public let state: BehaviorSubject<S>
-    
-    public let db = DisposeBag()
-    
-    public init(state: S, reducer: @escaping Store<S>.Reducer, middlewares: [Middleware<S>]) {
-        self.store = Store(state: state, reducer: reducer, middlewares: middlewares)
-        self.state = BehaviorSubject(value: state)
-        
-        self.store.subscribe(self)
-    }
-    
-    public var currentState: S {
-        return try! self.state.value()
-    }
-    
-    public func dispatch(_ action: Action) -> Any {
-        return self.store.dispatch(action)
-    }
-}
+    public init(state initialState: StateType,
+                reducer: @escaping Reducer<StateType> = StateType.reduce,
+                middlewares: [Middleware<StateType>] = [])
+    {
+        self.subscription = BehaviorSubject(value: (initialState, Never.do))
 
-extension RxStore: StoreSubscriber  {
-    public func store(didChangeState state: S, action: Action) {
-        self.state.onNext(state)
+        self.store = Store(state: initialState,
+                           reducer: reducer,
+                           middlewares: middlewares)
+
+        self.store.subscribe { [weak self] (state, action) in
+            guard let self = self else { return }
+
+            if let observable = action as? Observable<Any> {
+                observable.subscribe().disposed(by: self.db)
+            }
+
+            self.subscription.onNext((state, action))
+        }
+    }
+
+    public func dispatch(_ action: Action) {
+        self.store.dispatch(action)
     }
 }

@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'RxReduxift'
-  s.version          = '0.2.0'
+  s.version          = '0.3.0'
   s.summary          = 'RxSwift extension for Reduxift.'
 
 # This description is used to generate tags and improve search results.
@@ -31,7 +31,7 @@ RxStore provides state observable and Observables are used for async action.
   # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
   s.ios.deployment_target = '8.0'
-  s.swift_version = '4.2'
+  s.swift_version = '5'
 
   s.source_files = 'RxReduxift/Classes/**/*'
   
@@ -42,6 +42,6 @@ RxStore provides state observable and Observables are used for async action.
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
   # s.dependency 'AFNetworking', '~> 2.3'
-  s.dependency 'Reduxift', '~> 0.1'
-  s.dependency 'RxSwift', '~> 4.0'
+  s.dependency 'Reduxift', '~> 0.3.0'
+  s.dependency 'RxSwift', '~> 5.0'
 end
