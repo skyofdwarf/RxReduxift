@@ -10,51 +10,117 @@ import UIKit
 import Reduxift
 import RxReduxift
 import RxSwift
-//import RxCocoa
-
+import RxCocoa
 
 enum BreedListAction: Action {
     case fetch(breed: String?)
-    case alert(String)
+    case cancel(Canceller)
     
-    case requestBreedsFor(_ breed: String?)
-    case receiveBreeds(_ breeds: [String])
+    case fetching(Canceller)
+    case result(Result<[String], Error>)
 }
 
-extension BreedListAction {
-    var payload: Any? {
-        switch self {
-        case let .fetch(breed):
-            return observable { (dispatch) -> Observable<[String]> in
-                _ = dispatch(.requestBreedsFor(breed))
-                
-                return BreedListAction.fetchBreeds(for: breed)
-                    .debug()
-                    .do(onNext: { (breeds) in
-                        _ = dispatch(.receiveBreeds(breeds))
-                    }, onError: { (error) in
-                        _ = dispatch(.alert("failed to parse json from response"))
-                    })
-            }
-            
-        case let .alert(msg):
-            return msg;
-        case let .requestBreedsFor(breed):
-            return breed
-        case let .receiveBreeds(breeds):
-            return breeds
+extension BreedListAction: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.fetch, .fetch):
+            return true
+        case (.fetching, .fetching):
+            return true
+        case (.result, .result):
+            return true
+        default:
+            return false
         }
     }
-    
-    static func fetchBreeds(for breed: String?) -> Observable<[String]> {
+}
+
+extension BreedListAction: Doable {
+    func `do`(_ dispatch: @escaping StoreDispatcher) -> Reaction {
+        switch self {
+        case .fetch(let breed):
+            let disposable = BreedService.fetch(breed: breed)
+                .debug()
+                .do(onNext: { (breeds) in
+                    dispatch(BreedListAction.result(.success(breeds)))
+                }, onError: { (error) in
+                    dispatch(BreedListAction.result(.failure(error)))
+                })
+                .subscribe()
+
+            return BreedListAction.fetching({ disposable.dispose() })
+
+        case .cancel(let canceller):
+            canceller()
+
+        default:
+            break
+        }
+
+        return self
+    }
+}
+
+struct ListState: State {
+    var breeds: [String] = []
+
+    var fetching = false
+    var cancelling = false
+    var canceller: Canceller?
+
+    var alert = ""
+}
+
+extension ListState {
+    static func reduce(_ state: ListState, _ action: Action) -> ListState {
+        var state = state
+        switch action {
+        case BreedListAction.result(let result):
+            state.fetching = false
+            state.cancelling = false
+            state.canceller = nil
+
+            switch result {
+            case .success(let breeds):
+                state.breeds = breeds
+            case .failure(let error):
+                state.alert = error.localizedDescription
+            }
+
+        case BreedListAction.fetching(let canceller):
+            state.fetching = true
+            state.cancelling = false
+            state.canceller = canceller
+
+        case BreedListAction.cancel:
+            state.fetching = true
+            state.cancelling = true
+            state.canceller = nil
+
+        default:
+            break
+        }
+
+        return state
+    }
+}
+
+struct BreedService {
+    static func fetch(breed: String?) -> Observable<[String]> {
         return Observable.create { (observer) -> Disposable in
-            let urlString = "https://dog.ceo/api/breeds/\((breed != nil) ? breed! + "/list": "list/all")"
+            let urlString: String = { breed in
+                if let breed = breed {
+                    return "https://dog.ceo/api/breeds/\(breed)/list"
+                }
+                else {
+                    return "https://dog.ceo/api/breeds/list/all"
+                }
+            }(breed)
             
             guard let url = URL(string: urlString) else {
-                observer.onError("failed to create a url for breed: \(breed ?? "no brred")")
+                observer.onError("failed to create a url for breed: \(breed ?? "No breed")")
                 return Disposables.create()
             }
-            
             
             let task = URLSession.shared.dataTask(with: url, completionHandler: { (data, response, error) in
                 guard error == nil else {
@@ -65,12 +131,12 @@ extension BreedListAction {
                 
                 guard
                     let data = data,
-                    let json = try? JSONSerialization.jsonObject(with: data, options: []) as! [String: Any] else {
+                    let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                         observer.onError("failed to parse json from response")
                         return
                 }
                 
-                if let breeds = json.message as Any? as? [String: Any] {
+                if let breeds = json["message"] as? [String: Any] {
                     print("breeds: \(breeds)")
                     observer.onNext(Array(breeds.keys))
                     observer.onCompleted()
@@ -91,146 +157,164 @@ extension BreedListAction {
 }
 
 
-
 /// Example to use predefined DictionaryState
 class BreedListViewController: UIViewController {
     @IBOutlet weak var tableView: UITableView!
+
+    var indicator: UIActivityIndicatorView!
+    var fetchButton: UIBarButtonItem!
+    var cancelButton: UIBarButtonItem!
     
     let db = DisposeBag()
-    
-    lazy var store: RxDictionaryStore = createStore()
+    let store = RxStore(state: ListState(), middlewares: [DoableMiddleware(),
+                                                          LogMiddleware("[LOG]", { (tag, action, getState) in
+                                                            print("\(tag) <\(action)>")
+                                                          })])
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
         
-        self.title = "RxReduxift"
+        title = "RxReduxift"
 
+        buildUI()
+        bindState()
+    }
+}
+
+
+extension BreedListViewController {
+    func buildUI() {
+        buildIndicator()
         buildBarButtons()
-        
-        observeBreeds(from: self.store.state)
-        observeAlertMessage(from: self.store.state)
     }
-    
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        
-    }
-}
 
-extension BreedListViewController {
-    func createStore() -> RxDictionaryStore {
-        let breedsReducer = BreedListAction.reduce([]) { (state, action) in
-            if case let .receiveBreeds(breeds) = action {
-                return breeds
-            }
-            else {
-                return state
-            }
-        }
-        
-        let alertReducer = BreedListAction.reduce("") { (state, action) in
-            if case let .alert(msg) = action {
-                return msg
-            }
-            else {
-                return state
-            }
-        }
-        
-        let fetchingReducer = BreedListAction.reduce(false) { (state, action) in
-            switch action {
-            case .requestBreedsFor:
-                return true
-            case .receiveBreeds:
-                return false
-                
-            default:
-                return state
-            }
-        }
-        
-        let reducer = DictionaryStore.reduce { (state, action) in
-            return [ "description": "RxReduxift Example App",
-                     "data": [ "dogs": [ "breeds": breedsReducer(state.data?.dogs?.breeds, action),
-                                         "shout": "bow" ],
-                               "cats": "NA" ],
-                     "alert": alertReducer(state.alert, action),
-                     "fetching": fetchingReducer(state.fetching, action)
-            ]
-        }
-        
-        return RxDictionaryStore(state: reducer([:], NamedAction("init state")),
-                                 reducer: reducer,
-                                 middlewares:[ MainQueueMiddleware(),
-                                               FunctionMiddleware({ print("log: \($1)") }),
-                                               AsyncActionMiddleware(),
-                                               ObservablePayloadMiddleware() ])
-    }
-}
+    func buildIndicator() {
+        indicator = UIActivityIndicatorView(style: .whiteLarge)
+        indicator.hidesWhenStopped = true
+        indicator.color = .red
 
-extension BreedListViewController {
+        view.addSubview(indicator)
+        view.bringSubviewToFront(indicator)
+
+        indicator.center = view.center
+    }
+
     func buildBarButtons() {
-        let fetchButton = UIBarButtonItem(title: "Fetch",
+        fetchButton = UIBarButtonItem(title: "Fetch",
                                           style: .plain,
                                           target: nil,
                                           action: nil)
 
-        self.navigationItem.rightBarButtonItem = fetchButton
-        
-        fetchButton.rx.tap.bind { [weak self] in
-            self?.reload()
-            }.disposed(by: self.db)
+        cancelButton = UIBarButtonItem(title: "Cancel",
+                                       style: .plain,
+                                       target: nil,
+                                       action: nil)
+
+        navigationItem.rightBarButtonItems = [ fetchButton, cancelButton ]
+    }
+}
+
+extension BreedListViewController {
+    func bindState() {
+        bindStateInput()
+        bindStateOutput()
+    }
+
+    func bindStateInput() {
+        fetchButton.rx.tap.bind { [unowned self] in
+            self.store.dispatch(BreedListAction.fetch(breed: nil))
+        }
+        .disposed(by: db)
+
+        cancelButton.rx.tap.bind { [unowned self] in
+            guard let canceller = self.store.currentState.canceller else { return }
+            self.store.dispatch(BreedListAction.cancel(canceller))
+        }
+        .disposed(by: db)
+    }
+
+    func bindStateOutput() {
+        // action
+        store.action
+            .bind(to: rx.action)
+            .disposed(by: db)
+
+        // list
+        let breeds: Observable<[String]> = store.state
+            .map { $0.breeds }
+            .distinctUntilChanged()
+            .share()
+
+        tableView.rx.methodInvoked(#selector(UIView.didMoveToWindow))
+            .take(1)
+            .flatMap { _ -> Observable<[String]> in breeds }
+            .bind(to: tableView.rx.items(cellIdentifier: "BreedCell")) { (row, breed, cell) in
+                cell.textLabel?.text = breed
+        }.disposed(by: db)
+
+        // selection
+        self.tableView.rx.itemSelected.withLatestFrom(breeds) { (ip, breeds) in
+            return breeds[ip.row]
+        }
+        .bind(to: rx.selection)
+        .disposed(by: db)
+
+        // fetching
+        store.state
+            .map{ $0.fetching }
+            .bind(to: indicator.rx.isAnimating)
+            .disposed(by: db)
+
+        // buttons
+        store.state
+            .map{ !$0.fetching && !$0.cancelling }
+            .bind(to: fetchButton.rx.isEnabled)
+            .disposed(by: db)
+
+        store.state
+            .map{ $0.fetching && !$0.cancelling }
+            .bind(to: cancelButton.rx.isEnabled)
+            .disposed(by: db)
     }
     
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned self] (actin) in
-            _ = self.store.dispatch(BreedListAction.alert(""))
+        alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned alert] (actin) in
+            alert.dismiss(animated: true, completion: nil)
         })
         
-        self.present(alert, animated: true, completion: nil)
-    }
-    
-    func reload() {
-        if let disposable = self.store.dispatch(BreedListAction.fetch(breed: nil)) as? Disposable {
-            disposable.disposed(by: self.db)
-        }
-    }
-    
-    func observeBreeds(from state: Observable<DictionaryState>) {
-        
-        let breeds = state.map { (state) in
-            return state.data?.dogs?.breeds as Any? as! [String]
-            }
-            .distinctUntilChanged()
-            .share()
-        
-        breeds.bind(to: self.tableView.rx.items(cellIdentifier: "BreedCell")) { (row, breed, cell) in
-                cell.textLabel?.text = breed
-            }.disposed(by: self.store.db)
-        
-        self.tableView.rx.itemSelected.withLatestFrom(breeds) { (ip, breeds) in
-            return breeds[ip.row]
-            }
-            .subscribe(onNext: { [weak self] breed in
-                if let vc = self?.storyboard?.instantiateViewController(withIdentifier: "randomdog") as? RandomDogViewController {
-                    vc.breed = breed
-                    
-                    self?.show(vc, sender: nil)
-                }
-            }).disposed(by: self.store.db)
-    }
-    
-    func observeAlertMessage(from state: Observable<DictionaryState>) {
-        state.map { state in
-            return state.alert as Any? as! String
-            }
-            .filter({ !$0.isEmpty })
-            .subscribe(onNext: { [weak self] msg in
-                print("next alert: \(msg)")
-                self?.alert(msg)
-            }).disposed(by: self.store.db)
+        present(alert, animated: true, completion: nil)
     }
 }
+
+// MARK: Reactive
+
+extension Reactive where Base: BreedListViewController {
+    var action: Binder<Action> {
+        return Binder(base) { (base, action) in
+            switch action {
+            case BreedListAction.result(let result):
+                switch result {
+                case .failure(let error):
+                    base.alert(error.localizedDescription)
+                default:
+                    break
+                }
+            default:
+                break
+            }
+        }
+    }
+
+    var selection: Binder<String> {
+        return Binder(base) { (base, breed) in
+            if let vc = base.storyboard?.instantiateViewController(withIdentifier: "randomdog") as? RandomDogViewController {
+                vc.breed = breed
+                base.show(vc, sender: nil)
+            }
+        }
+    }
+}
+

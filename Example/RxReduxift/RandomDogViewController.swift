@@ -10,51 +10,57 @@ import UIKit
 import Reduxift
 import RxReduxift
 import RxSwift
+import RxCocoa
 
 extension String: Error {}
 
-struct RandomDogState: State {
-    var imageUrl: String = ""
-    var alert: String = ""
-    var fetching: Bool = false
+enum CommonError: Error {
+    case userCancelled
 }
 
 enum RandomDogAction: Action {
     case fetch(breed: String?)
-    case alert(String)
+    case cancel(Canceller)
     
-    case requestImageUrlFor(_ breed: String?)
-    case receiveImageUrl(_ url: String)
+    case fetching(Canceller)
+    case result(Result<UIImage?, Error>)
 }
 
-extension RandomDogAction {
-    var payload: Any? {
+extension RandomDogAction: Doable {
+    func `do`(_ dispatch: @escaping StoreDispatcher) -> Reaction {
         switch self {
         case let .fetch(breed):
-            return RandomDogAction.observable { (dispatch) -> Observable<String> in
-                _ = dispatch(.requestImageUrlFor(breed))
-                
-                return RandomDogAction.fetchImageUrl(for: breed)
-                    .debug()
-                    .do(onNext: { (url) in
-                        _ = dispatch(.receiveImageUrl(url))
-                    }, onError: { (error) in
-                        _ = dispatch(.alert("failed to parse json from response"))
-                    })
+            let disposable = ImageService.fetchImageUrl(for: breed)
+                .flatMap { ImageService.fetchImage(url: $0) }
+                .observeOn(MainScheduler.instance)
+                .do(onNext: { (image) in
+                    dispatch(RandomDogAction.result(.success(image)))
+                }, onError: { (error) in
+                    dispatch(RandomDogAction.result(.failure(error)))
+                })
+                .subscribe()
+
+            return RandomDogAction.fetching({ disposable.dispose() })
+
+        case .cancel(let canceller):
+            // Calling canceller causes Observable to be disposed
+            canceller()
+
+            // Simulate delayed cancelling
+            DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+                dispatch(RandomDogAction.result(.failure(CommonError.userCancelled)))
             }
 
-            
-        case let .requestImageUrlFor(breed):
-            return breed
-            
-        case let .receiveImageUrl(url):
-            return url
-            
-        case let .alert(msg):
-            return msg
+            return self
+
+        default:
+            break
         }
+        return self
     }
-    
+}
+
+struct ImageService {
     static func fetchImageUrl(for breed: String?) -> Observable<String> {
         return Observable.create { (observer) -> Disposable in
             let urlString = ((breed == nil) ?
@@ -75,12 +81,12 @@ extension RandomDogAction {
                 
                 guard
                     let data = data,
-                    let json = try? JSONSerialization.jsonObject(with: data, options: []) as! [String: Any] else {
+                    let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] else {
                         observer.onError("failed to parse json from response")
                         return
                 }
                 
-                if let imageUrl = json.message as Any? as? String {
+                if let imageUrl = json["message"] as? String {
                     print("image url: \(imageUrl)")
                     observer.onNext(imageUrl)
                     observer.onCompleted()
@@ -97,11 +103,67 @@ extension RandomDogAction {
             }
         }
     }
+
+    static func fetchImage(url: String) -> Observable<UIImage?> {
+        return Observable.create { (observer) -> Disposable in
+            if let url = URL(string: url), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
+                observer.onNext(image)
+                observer.onCompleted()
+            }
+            else {
+                observer.onError("failed to download image data from: \(url)")
+            }
+
+            return Disposables.create()
+        }
+        .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background))
+    }
 }
 
+struct RandomDogState: State {
+    var image: UIImage?
+    var alert: String = ""
 
+    var fetching = false
+    var cancelling = false
+    var canceller: Canceller?
+}
 
-/// Example to use user defined state
+extension RandomDogState {
+    static func reduce(_ state: RandomDogState, _ action: Action) -> RandomDogState {
+        var state = state
+
+        switch action {
+        case RandomDogAction.fetching(let canceller):
+            state.fetching = true
+            state.cancelling = false
+            state.canceller = canceller
+
+        case RandomDogAction.result(let result):
+            state.fetching = false
+            state.cancelling = false
+            state.canceller = nil
+
+            switch result {
+            case .success(let image):
+                state.image = image
+            case .failure(let error):
+                state.alert = error.localizedDescription
+            }
+
+        case RandomDogAction.cancel:
+            state.fetching = true
+            state.cancelling = true
+            state.canceller = nil
+
+        default:
+            break
+        }
+        return state
+    }
+
+}
+
 class RandomDogViewController: UIViewController {
     @IBOutlet weak var dogImageView: UIImageView!
     
@@ -110,16 +172,20 @@ class RandomDogViewController: UIViewController {
     var fetchButton: UIBarButtonItem!
     var cancelButton: UIBarButtonItem!
     
-    let db = DisposeBag()    
-    var compositeDisposable: CompositeDisposable?
-    
-    lazy var store: RxStore<RandomDogState> = createStore()
-    
+    let db = DisposeBag()
+    let store = RxStore(state: RandomDogState(), middlewares: [DoableMiddleware(),
+                                                               LogMiddleware("[ACTION]", { (tag, action, getState) in
+                                                                print("\(tag) <\(action)>")
+                                                               }),
+                                                               LazyLogMiddleware("[STATE]", { (tag, action, getState) in
+                                                                print("\(tag) \(getState())")
+                                                               })
+    ])
     
     var breed: String?
     
     deinit {
-        print("deinit")
+        print("\(String(describing: self)) - deinit")
     }
     
     override func viewDidLoad() {
@@ -127,179 +193,143 @@ class RandomDogViewController: UIViewController {
 
         // Do any additional setup after loading the view.
         
-        self.title = self.breed ?? "Random Dog"
+        title = breed ?? "Random Dog"
         
-        buildIndicator()
-        buildBarButtons()
-        
-        observeDogImage(from: self.store.state)
-        observeAlertMessage(from: self.store.state)
-        observeFetchingStatus(from: self.store.state)
+        buildUI()
+        bindState()
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-        self.reload()
+
+        store.dispatch(RandomDogAction.fetch(breed: breed))
     }
 }
 
 extension RandomDogViewController {
-    func createStore() -> RxStore<RandomDogState> {
-        let reducer = RandomDogState.reduce { (state, action) in
-            guard let action = action as? RandomDogAction else {
-                return state
-            }
-            
-            var state = state
-            
-            switch action {
-            case .requestImageUrlFor:
-                state.fetching = true
-            case let .receiveImageUrl(url):
-                state.imageUrl = url
-                state.fetching = false
-            case let .alert(msg):
-                state.alert = msg
-                state.fetching = false
-            default:
-                return state
-            }
-            return state
-        }
-        
-        
-        return RxStore<RandomDogState>(state: RandomDogState(),
-                                       reducer: reducer,
-                                       middlewares:[ MainQueueMiddleware(),
-                                                     FunctionMiddleware({ print("log: \($1)") }),
-                                                     AsyncActionMiddleware(),
-                                                     ObservablePayloadMiddleware() ])
+    func buildUI() {
+        buildIndicator()
+        buildBarButtons()
     }
 
     func buildIndicator() {
-        self.indicator = UIActivityIndicatorView(style: .gray)
-        self.indicator.hidesWhenStopped = true
+        indicator = UIActivityIndicatorView(style: .whiteLarge)
+        indicator.hidesWhenStopped = true
+        indicator.color = .red
         
-        self.view.addSubview(self.indicator)
-        self.view.bringSubviewToFront(self.indicator)
+        view.addSubview(indicator)
+        view.bringSubviewToFront(indicator)
         
-        self.indicator.center = self.view.center
+        indicator.center = view.center
     }
     
     func buildBarButtons() {
-        self.fetchButton = UIBarButtonItem(title: "Fetch",
-                                           style: .plain,
-                                           target: nil,
-                                           action: nil)
+        fetchButton = UIBarButtonItem(title: "Fetch",
+                                      style: .plain,
+                                      target: nil,
+                                      action: nil)
         
-        self.cancelButton = UIBarButtonItem(title: "Cancel",
-                                            style: .plain,
-                                            target: nil,
-                                            action: nil)
+        cancelButton = UIBarButtonItem(title: "Cancel",
+                                       style: .plain,
+                                       target: nil,
+                                       action: nil)
         
-        self.navigationItem.rightBarButtonItems = [ self.cancelButton, self.fetchButton ]
-        
-        self.fetchButton.rx.tap.bind { [weak self] in
-            self?.reload()
-            }.disposed(by: self.db)
-        
-        self.cancelButton.rx.tap.bind { [weak self] in
-            self?.cancel()
-            }.disposed(by: self.db)
+        navigationItem.rightBarButtonItems = [ fetchButton, cancelButton ]
+    }
+}
+
+extension RandomDogViewController {
+    func bindState() {
+        bindStateInput()
+        bindStateOutput()
+    }
+
+    func bindStateInput() {
+        fetchButton.rx.tap.bind { [unowned self] in
+            self.store.dispatch(RandomDogAction.fetch(breed: self.breed))
+        }
+        .disposed(by: db)
+
+        cancelButton.rx.tap.bind { [unowned self] in
+            guard let canceller = self.store.currentState.canceller else { return }
+            self.store.dispatch(RandomDogAction.cancel(canceller))
+        }
+        .disposed(by: db)
+    }
+
+    func bindStateOutput() {
+        // action
+        store.action
+            .bind(to: rx.action)
+            .disposed(by: db)
+
+        // image
+        store.state
+            .map{ $0.image }
+            .bind(to: rx.image)
+            .disposed(by: db)
+
+        // fetching
+        store.state
+            .map{ $0.fetching }
+            .bind(to: indicator.rx.isAnimating)
+            .disposed(by: db)
+
+        // buttons
+        store.state
+            .map{ !$0.fetching && !$0.cancelling }
+            .bind(to: fetchButton.rx.isEnabled)
+            .disposed(by: db)
+
+        store.state
+            .map{ $0.fetching && !$0.cancelling }
+            .bind(to: cancelButton.rx.isEnabled)
+            .disposed(by: db)
     }
 }
 
 extension RandomDogViewController {
     func alert(_ msg: String) {
         let alert = UIAlertController(title: nil, message: msg, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned self] (actin) in
-            _ = self.store.dispatch(RandomDogAction.alert(""))
+        alert.addAction(UIAlertAction(title: "Ok", style: .default) { [unowned alert] (actin) in
+            alert.dismiss(animated: true, completion: nil)
         })
         
-        self.present(alert, animated: true, completion: nil)
-    }
-    
-    func reload() {
-        if let disposable = self.store.dispatch(RandomDogAction.fetch(breed: self.breed)) as? Disposable {
-            
-            disposable.disposed(by: self.db)
-            
-            self.compositeDisposable = CompositeDisposable(disposables: [ disposable ])
-        }
-    }
-    
-    func cancel() {
-        if let isDisposed = self.compositeDisposable?.isDisposed, !isDisposed {
-            self.compositeDisposable?.dispose()
-            self.compositeDisposable = nil
-            
-            _ = self.store.dispatch(RandomDogAction.alert("user cancelled"))
-        }
-    }
-    
-    /// - Note: don't care data downloading of image in here. in practice download and display of image are covered other frameworks cares about based on url of image.
-    func observeDogImage(from state: Observable<RandomDogState>) {
-        
-        state
-            .map{ return $0.imageUrl }
-            .distinctUntilChanged()
-            .filter { !$0.isEmpty }
-            .flatMap({ fetchImage(url: $0) })
-            .observeOn(MainScheduler.instance)
-            .do(onError: { [weak self] (error) in
-                _ = self?.store.dispatch(RandomDogAction.alert(error.localizedDescription))
-            })
-            .catchErrorJustReturn(nil)
-            .subscribe(onNext: { [weak self] (image) in
-                self?.dogImageView.image = image
-            })
-            .disposed(by: self.store.db)
-    }
-    
-    func observeAlertMessage(from state: Observable<RandomDogState>) {
-        state
-            .map { return $0.alert as Any? as! String }
-            .distinctUntilChanged()
-            .filter { !$0.isEmpty }
-            .subscribe(onNext: { [weak self] msg in
-                self?.alert(msg)
-            }).disposed(by: self.store.db)
-    }
-    
-    func observeFetchingStatus(from state: Observable<RandomDogState>) {
-        let fetching = state
-            .map { return $0.fetching as Any? as! Bool }
-            .distinctUntilChanged()
-            .share()
-        
-        fetching
-            .bind(to: self.cancelButton.rx.isEnabled)
-            .disposed(by: self.db)
-        
-        fetching
-            .map { return !$0 }
-            .bind(to: self.fetchButton.rx.isEnabled)
-            .disposed(by: self.db)
-        
-        fetching
-            .bind(to: self.indicator.rx.isAnimating)
-            .disposed(by: self.db)
+        present(alert, animated: true, completion: nil)
     }
 }
 
+// MARK: Reactive
 
-fileprivate func fetchImage(url: String) -> Observable<UIImage?> {
-    return Observable.create { (observer) -> Disposable in
-        if let url = URL(string: url), let data = try? Data(contentsOf: url), let image = UIImage(data: data) {
-            observer.onNext(image)
-            observer.onCompleted()
+extension Reactive where Base: RandomDogViewController {
+    var action: Binder<Action> {
+        return Binder(base) { (base, action) in
+            switch action {
+            case BreedListAction.result(let result):
+                switch result {
+                case .failure(let error):
+                    base.alert(error.localizedDescription)
+                default:
+                    break
+                }
+            default:
+                break
+            }
         }
-        else {
-            observer.onError("failed to download image data from: \(url)")
+    }
+
+    var image: Binder<UIImage?> {
+        return Binder(base) { (base, image) in
+            base.dogImageView.image = image
         }
-        
-        return Disposables.create()
+    }
+
+    var selection: Binder<String> {
+        return Binder(base) { (base, breed) in
+            if let vc = base.storyboard?.instantiateViewController(withIdentifier: "randomdog") as? RandomDogViewController {
+                vc.breed = breed
+                base.show(vc, sender: nil)
+            }
         }
-        .subscribeOn(ConcurrentDispatchQueueScheduler(qos: .background)).share()
+    }
 }

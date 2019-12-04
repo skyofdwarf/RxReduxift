@@ -1,16 +1,25 @@
 PODS:
-  - Reduxift (0.3.0)
-  - RxReduxift (0.2.0):
-    - Reduxift (~> 0.3.0)
+  - Reduxift (0.4.0)
+  - RxCocoa (5.0.1):
+    - RxRelay (~> 5)
+    - RxSwift (~> 5)
+  - RxReduxift (0.3.0):
+    - Reduxift (~> 0.4.0)
+    - RxRelay (~> 5.0)
     - RxSwift (~> 5.0)
+  - RxRelay (5.0.1):
+    - RxSwift (~> 5)
   - RxSwift (5.0.1)
 
 DEPENDENCIES:
+  - RxCocoa (~> 5.0)
   - RxReduxift (from `../`)
 
 SPEC REPOS:
   trunk:
     - Reduxift
+    - RxCocoa
+    - RxRelay
     - RxSwift
 
 EXTERNAL SOURCES:
@@ -18,10 +27,12 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  Reduxift: f7250b4e8ecedaf65e0c7825f3164418a090d17c
-  RxReduxift: fcb845c9c64ea3007c1ebef30f383f4aee4d5484
+  Reduxift: 63d5cefae0c2137eb0468574f412cdb62b84fec8
+  RxCocoa: e741b9749968e8a143e2b787f1dfbff2b63d0a5c
+  RxReduxift: 1cd66a8f7824e2540788a6c8cdb69f91ae84ca58
+  RxRelay: 89d54507f4fd4d969e6ec1d4bd7f3673640b4640
   RxSwift: e2dc62b366a3adf6a0be44ba9f405efd4c94e0c4
 
-PODFILE CHECKSUM: 9efad13a98fde5cd999d3e67df80cd9b036f038a
+PODFILE CHECKSUM: 6a9196279cb8b4ea0cb7f3b41a1d9d42f9c6ef07
 
 COCOAPODS: 1.8.4
