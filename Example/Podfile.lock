@@ -1,10 +1,10 @@
 PODS:
-  - Reduxift (0.4.0)
+  - Reduxift (0.4.3)
   - RxCocoa (5.0.1):
     - RxRelay (~> 5)
     - RxSwift (~> 5)
-  - RxReduxift (0.3.0):
-    - Reduxift (~> 0.4.0)
+  - RxReduxift (0.4.0):
+    - Reduxift (~> 0.4.3)
     - RxRelay (~> 5.0)
     - RxSwift (~> 5.0)
   - RxRelay (5.0.1):
@@ -27,9 +27,9 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  Reduxift: 63d5cefae0c2137eb0468574f412cdb62b84fec8
+  Reduxift: 8396f870c067b9b254ba8f84feb418f49797a2e3
   RxCocoa: e741b9749968e8a143e2b787f1dfbff2b63d0a5c
-  RxReduxift: 1cd66a8f7824e2540788a6c8cdb69f91ae84ca58
+  RxReduxift: e32a7e840d748093a7c7bbf2059cfcacd047a964
   RxRelay: 89d54507f4fd4d969e6ec1d4bd7f3673640b4640
   RxSwift: e2dc62b366a3adf6a0be44ba9f405efd4c94e0c4
 

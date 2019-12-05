@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'RxReduxift'
-  s.version          = '0.4.0'
+  s.version          = '0.4.3'
   s.summary          = 'RxSwift extension for Reduxift.'
 
 # This description is used to generate tags and improve search results.
@@ -42,7 +42,7 @@ RxStore provides state observable and Observables are used for async action.
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
   # s.dependency 'AFNetworking', '~> 2.3'
-  s.dependency 'Reduxift', '~> 0.4.0'
+  s.dependency 'Reduxift', '~> 0.4.3'
   s.dependency 'RxSwift', '~> 5.0'
   s.dependency 'RxRelay', '~> 5.0'
 end
