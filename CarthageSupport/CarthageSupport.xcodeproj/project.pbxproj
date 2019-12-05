@@ -3,29 +3,25 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 50;
+	objectVersion = 51;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CE534FD92399F19300377C77 /* RxSwift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE534FCE2399F14600377C77 /* RxSwift.framework */; };
+		CE534FDC2399F40700377C77 /* Reduxift.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE534FDB2399F40700377C77 /* Reduxift.framework */; };
 		CE551CB32398F94000FB8530 /* CarthageSupport.h in Headers */ = {isa = PBXBuildFile; fileRef = CE551CB12398F94000FB8530 /* CarthageSupport.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		CE551CC12398F98B00FB8530 /* State.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CBB2398F98B00FB8530 /* State.swift */; };
-		CE551CC22398F98B00FB8530 /* Middleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CBC2398F98B00FB8530 /* Middleware.swift */; };
-		CE551CC32398F98B00FB8530 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CBD2398F98B00FB8530 /* Store.swift */; };
-		CE551CC42398F98B00FB8530 /* Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CBE2398F98B00FB8530 /* Action.swift */; };
-		CE551CC52398F98B00FB8530 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CBF2398F98B00FB8530 /* Types.swift */; };
-		CE551CC62398F98B00FB8530 /* Doable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CC02398F98B00FB8530 /* Doable.swift */; };
+		CE551CD223990A3400FB8530 /* RxReduxift.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE551CCE23990A3400FB8530 /* RxReduxift.swift */; };
+		CE93A1C5239A0D8600E3DAE2 /* RxRelay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE93A1C4239A0D8600E3DAE2 /* RxRelay.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		CE534FCE2399F14600377C77 /* RxSwift.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RxSwift.framework; path = ../Carthage/Build/iOS/RxSwift.framework; sourceTree = "<group>"; };
+		CE534FDB2399F40700377C77 /* Reduxift.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Reduxift.framework; path = ../Carthage/Build/iOS/Reduxift.framework; sourceTree = "<group>"; };
 		CE551CAE2398F94000FB8530 /* RxReduxift.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = RxReduxift.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE551CB12398F94000FB8530 /* CarthageSupport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CarthageSupport.h; sourceTree = "<group>"; };
 		CE551CB22398F94000FB8530 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		CE551CBB2398F98B00FB8530 /* State.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = State.swift; sourceTree = "<group>"; };
-		CE551CBC2398F98B00FB8530 /* Middleware.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Middleware.swift; sourceTree = "<group>"; };
-		CE551CBD2398F98B00FB8530 /* Store.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
-		CE551CBE2398F98B00FB8530 /* Action.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Action.swift; sourceTree = "<group>"; };
-		CE551CBF2398F98B00FB8530 /* Types.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
-		CE551CC02398F98B00FB8530 /* Doable.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Doable.swift; sourceTree = "<group>"; };
+		CE551CCE23990A3400FB8530 /* RxReduxift.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RxReduxift.swift; sourceTree = "<group>"; };
+		CE93A1C4239A0D8600E3DAE2 /* RxRelay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RxRelay.framework; path = ../Carthage/Build/iOS/RxRelay.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +29,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE534FD92399F19300377C77 /* RxSwift.framework in Frameworks */,
+				CE534FDC2399F40700377C77 /* Reduxift.framework in Frameworks */,
+				CE93A1C5239A0D8600E3DAE2 /* RxRelay.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -43,8 +42,9 @@
 			isa = PBXGroup;
 			children = (
 				CE551CB02398F94000FB8530 /* CarthageSupport */,
-				CE551CB92398F98B00FB8530 /* Reduxift */,
+				CE551CCB23990A3400FB8530 /* RxReduxift */,
 				CE551CAF2398F94000FB8530 /* Products */,
+				CE551CD423990ACF00FB8530 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -65,26 +65,31 @@
 			path = CarthageSupport;
 			sourceTree = "<group>";
 		};
-		CE551CB92398F98B00FB8530 /* Reduxift */ = {
+		CE551CCB23990A3400FB8530 /* RxReduxift */ = {
 			isa = PBXGroup;
 			children = (
-				CE551CBA2398F98B00FB8530 /* Classes */,
+				CE551CCC23990A3400FB8530 /* Classes */,
 			);
-			name = Reduxift;
-			path = ../../Reduxift/Reduxift;
+			name = RxReduxift;
+			path = ../RxReduxift;
 			sourceTree = "<group>";
 		};
-		CE551CBA2398F98B00FB8530 /* Classes */ = {
+		CE551CCC23990A3400FB8530 /* Classes */ = {
 			isa = PBXGroup;
 			children = (
-				CE551CBB2398F98B00FB8530 /* State.swift */,
-				CE551CBC2398F98B00FB8530 /* Middleware.swift */,
-				CE551CBD2398F98B00FB8530 /* Store.swift */,
-				CE551CBE2398F98B00FB8530 /* Action.swift */,
-				CE551CBF2398F98B00FB8530 /* Types.swift */,
-				CE551CC02398F98B00FB8530 /* Doable.swift */,
+				CE551CCE23990A3400FB8530 /* RxReduxift.swift */,
 			);
 			path = Classes;
+			sourceTree = "<group>";
+		};
+		CE551CD423990ACF00FB8530 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				CE93A1C4239A0D8600E3DAE2 /* RxRelay.framework */,
+				CE534FDB2399F40700377C77 /* Reduxift.framework */,
+				CE534FCE2399F14600377C77 /* RxSwift.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -109,6 +114,7 @@
 				CE551CAA2398F94000FB8530 /* Sources */,
 				CE551CAB2398F94000FB8530 /* Frameworks */,
 				CE551CAC2398F94000FB8530 /* Resources */,
+				CE551CDC23990BFF00FB8530 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -161,17 +167,34 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		CE551CDC23990BFF00FB8530 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"$(SRCROOT)/input.xcfilelist",
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+				"$(SRCROOT)/output.xcfilelist",
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\n/usr/local/bin/carthage copy-frameworks\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		CE551CAA2398F94000FB8530 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CE551CC32398F98B00FB8530 /* Store.swift in Sources */,
-				CE551CC42398F98B00FB8530 /* Action.swift in Sources */,
-				CE551CC12398F98B00FB8530 /* State.swift in Sources */,
-				CE551CC52398F98B00FB8530 /* Types.swift in Sources */,
-				CE551CC62398F98B00FB8530 /* Doable.swift in Sources */,
-				CE551CC22398F98B00FB8530 /* Middleware.swift in Sources */,
+				CE551CD223990A3400FB8530 /* RxReduxift.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,6 +329,7 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/../Carthage/Build/iOS";
 				INFOPLIST_FILE = CarthageSupport/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
@@ -331,6 +355,7 @@
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/../Carthage/Build/iOS";
 				INFOPLIST_FILE = CarthageSupport/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 8.0;
